@@ -37,9 +37,10 @@ body {
   font-weight: 600;
   color: #af5656;
 }
+/* THREE DOTS - updated to 0.5cm from right */
 .more-menu {
   position: absolute;
-  right: 0.3cm;
+  right: 0.5cm;          /* ← changed from 0.3cm to 0.5cm */
   font-size: 22px;
   cursor: pointer;
   color: #fff;
@@ -130,6 +131,8 @@ body {
   .page-content { margin-top: 45px; }
   .messages-container { padding-bottom: 60px; }
   .no-reply-info { padding: 12px; font-size: 12px; }
+  /* Optional: make three dots closer on very small screens if needed */
+  .more-menu { right: 0.4cm; }
 }
 </style>
 </head>
@@ -151,6 +154,7 @@ body {
 
 <script>
 const API = "https://mpesab.vercel.app";
+const MAX_MESSAGES = 16;
 
 // URL detection
 const urlRegex = /(https?:\/\/[^\s]+)|(www\.[^\s]+)/gi;
@@ -207,9 +211,12 @@ async function loadMessages() {
   try {
     const res = await fetch(`${API}/transactions`);
     const data = await res.json();
+
+    const recentMessages = [...data].reverse().slice(0, MAX_MESSAGES);
+
     container.innerHTML = "";
 
-    [...data].reverse().forEach(tx => {
+    recentMessages.forEach(tx => {
       const bubble = document.createElement("div");
       bubble.className = "message-bubble";
 
@@ -218,7 +225,6 @@ async function loadMessages() {
 
       if (url) {
         if (isMpesaRelatedLink(url)) {
-          // Large green M-PESA style banner like in native SMS apps
           previewHtml = `
             <div style="margin: 8px -14px -10px -14px; border-radius: 0 0 18px 18px; overflow: hidden; background: #00A859; width: calc(100% + 28px);">
               <img 
@@ -233,7 +239,6 @@ async function loadMessages() {
             </div>
           `;
         } else {
-          // Small favicon fallback for non-MPESA links
           const favicon = getFaviconUrl(url);
           if (favicon) {
             previewHtml = `
@@ -262,6 +267,11 @@ async function loadMessages() {
     });
 
     container.scrollTop = container.scrollHeight;
+
+    if (recentMessages.length === 0) {
+      container.innerHTML = `<div style="padding:50px; text-align:center; color:#888;">No recent messages</div>`;
+    }
+
   } catch (err) {
     container.innerHTML = `<div style="padding:50px; text-align:center; color:#888;">
       Failed to load messages<br><small>${err.message}</small>
@@ -291,36 +301,29 @@ loadMessages();
 </script>
 
 <script>
-// PWA install prompt
+// PWA install
 let deferredPrompt;
 const installBtn = document.getElementById("installBtn");
 
 window.addEventListener("beforeinstallprompt", (e) => {
   e.preventDefault();
   deferredPrompt = e;
-  setTimeout(() => {
-    installBtn.style.display = "block";
-  }, 8000);
+  setTimeout(() => { installBtn.style.display = "block"; }, 8000);
 });
 
 installBtn.addEventListener("click", async () => {
   if (!deferredPrompt) return;
   deferredPrompt.prompt();
   const { outcome } = await deferredPrompt.userChoice;
-  if (outcome === "accepted") {
-    installBtn.style.display = "none";
-  }
+  if (outcome === "accepted") installBtn.style.display = "none";
   deferredPrompt = null;
 });
 
-window.addEventListener("appinstalled", () => {
-  installBtn.style.display = "none";
-});
+window.addEventListener("appinstalled", () => { installBtn.style.display = "none"; });
 
 // Service Worker
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js')
-    .catch(err => console.log("Service Worker failed:", err));
+  navigator.serviceWorker.register('sw.js').catch(err => console.log("SW failed:", err));
 }
 </script>
 </body>
