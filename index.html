@@ -1,19 +1,15 @@
 
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Messages</title>
-
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#000000">
-
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
-
-body { 
+body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
   background: #000;
   color: #fff;
@@ -21,7 +17,6 @@ body {
   display: flex;
   flex-direction: column;
 }
-
 .messages-header {
   position: fixed;
   top: 0;
@@ -36,16 +31,12 @@ body {
   gap: 10px;
   height: 50px;
 }
-
 .logo { height: 28px; }
-
 .header-title {
   font-size: 1.3rem;
   font-weight: 600;
   color: #af5656;
 }
-
-/* THREE DOTS */
 .more-menu {
   position: absolute;
   right: 0.3cm;
@@ -54,10 +45,8 @@ body {
   color: #fff;
   user-select: none;
 }
-
-/* PAGE */
 .page-content {
-  margin-top: 50px; /* matches header height */
+  margin-top: 50px;
   flex: 1 1 auto;
   max-width: 500px;
   margin-left: auto;
@@ -66,17 +55,14 @@ body {
   display: flex;
   flex-direction: column;
 }
-
 .messages-container {
   background: #000;
   flex: 1 1 auto;
   overflow-y: auto;
-  padding: 10px 10px 70px 10px; /* padding-bottom leaves space for fixed bar */
+  padding: 10px 10px 70px 10px;
   display: flex;
   flex-direction: column;
 }
-
-/* MESSAGE */
 .message-bubble {
   max-width: 90%;
   padding: 10px 14px;
@@ -89,19 +75,16 @@ body {
   animation: slideInUp 0.4s ease both;
   transition: opacity 0.2s ease, transform 0.2s ease;
 }
-
 .message-bubble.hide {
   opacity: 0;
   transform: scale(0.9);
 }
-
 .message-time {
   font-size: 11px;
   opacity: 0.7;
-  margin-top: 2px;
+  margin-top: 4px;
+  text-align: right;
 }
-
-/* INSTALL FLOATING BUTTON */
 .install-btn {
   position: fixed;
   bottom: 90px;
@@ -118,12 +101,9 @@ body {
   z-index: 999;
   animation: fadeUp 0.4s ease;
 }
-
 .install-btn span {
   margin-right: 6px;
 }
-
-/* “You can't reply” TAB fixed at bottom */
 .no-reply-info {
   position: fixed;
   bottom: 0;
@@ -137,17 +117,14 @@ body {
   border-top: 1px solid #333;
   z-index: 100;
 }
-
 @keyframes slideInUp {
   from { opacity: 0; transform: translateY(30px); }
   to { opacity: 1; transform: translateY(0); }
 }
-
 @keyframes fadeUp {
   from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
 }
-
 @media (max-width:480px) {
   .messages-header { padding: 8px 10px; height: 45px; gap: 6px; }
   .page-content { margin-top: 45px; }
@@ -156,25 +133,18 @@ body {
 }
 </style>
 </head>
-
 <body>
-
 <div class="messages-header">
   <img src="logo.png" class="logo">
   <h1 class="header-title"></h1>
   <div class="more-menu">⋮</div>
 </div>
-
 <div class="page-content">
   <div class="messages-container" id="messages"></div>
 </div>
-
-<!-- FULL TAB for "You can't reply" -->
 <div class="no-reply-info">
   You can't reply to this short code. Learn more
 </div>
-
-<!-- INSTALL BUTTON -->
 <div class="install-btn" id="installBtn">
   <span>⬇️</span> Install App
 </div>
@@ -182,7 +152,51 @@ body {
 <script>
 const API = "https://mpesab.vercel.app";
 
-/* MESSAGE LOAD */
+// URL detection
+const urlRegex = /(https?:\/\/[^\s]+)|(www\.[^\s]+)/gi;
+
+function extractFirstUrl(text) {
+  const match = text.match(urlRegex);
+  if (!match) return null;
+  let url = match[0].trim();
+  if (url.startsWith('www.')) url = 'https://' + url;
+  url = url.replace(/[.,!?;)\]}>]+$/g, '');
+  return url;
+}
+
+function isMpesaRelatedLink(url) {
+  if (!url) return false;
+  const lower = url.toLowerCase();
+  return lower.includes('mpesa') || 
+         lower.includes('bit.ly/mpesa') || 
+         lower.includes('safaricom') || 
+         lower.includes('mpesaln');
+}
+
+function getFaviconUrl(url) {
+  if (!url) return null;
+  try {
+    const domain = new URL(url).origin;
+    return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64`;
+  } catch {
+    return null;
+  }
+}
+
+function renderMessageContent(text) {
+  let safe = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+  safe = safe.replace(urlRegex, (match) => {
+    let full = match.startsWith('www.') ? 'https://' + match : match;
+    return `<a href="${full}" target="_blank" rel="noopener noreferrer" style="color:#60a5fa; text-decoration:underline;">${match}</a>`;
+  });
+
+  return safe;
+}
+
 function extractTimeFromMessage(message) {
   const match = message.match(/at (\d{1,2}:\d{2} (?:AM|PM))/i);
   return match ? match[1] : new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
@@ -196,28 +210,73 @@ async function loadMessages() {
     container.innerHTML = "";
 
     [...data].reverse().forEach(tx => {
-      const msg = document.createElement("div");
-      msg.className = "message-bubble";
-      msg.innerHTML = `
-        <div>${tx.message}</div>
-        <div class="message-time">${extractTimeFromMessage(tx.message)}</div>
-      `;
-      enableDoubleTapRemove(msg);
-      container.appendChild(msg);
+      const bubble = document.createElement("div");
+      bubble.className = "message-bubble";
+
+      const url = extractFirstUrl(tx.message);
+      let previewHtml = '';
+
+      if (url) {
+        if (isMpesaRelatedLink(url)) {
+          // Large green M-PESA style banner like in native SMS apps
+          previewHtml = `
+            <div style="margin: 8px -14px -10px -14px; border-radius: 0 0 18px 18px; overflow: hidden; background: #00A859; width: calc(100% + 28px);">
+              <img 
+                src="https://upload.wikimedia.org/wikipedia/commons/3/3b/M-PESA_LOGO-01.svg" 
+                alt="M-PESA" 
+                loading="lazy"
+                style="width: 100%; height: auto; display: block; background: #00A859; padding: 25px 0;"
+              >
+              <div style="padding: 8px 14px; color: white; font-size: 13px; text-align: center; background: rgba(0,0,0,0.2);">
+                ${new URL(url).hostname.replace(/^www\./, '')}
+              </div>
+            </div>
+          `;
+        } else {
+          // Small favicon fallback for non-MPESA links
+          const favicon = getFaviconUrl(url);
+          if (favicon) {
+            previewHtml = `
+              <div style="margin-top:8px; display:flex; align-items:center; gap:8px; font-size:12px; opacity:0.85;">
+                <img 
+                  src="${favicon}" 
+                  alt="" 
+                  loading="lazy"
+                  style="width:20px; height:20px; border-radius:4px; object-fit:contain; background:#fff;"
+                  onerror="this.style.display='none';"
+                >
+                <span>${new URL(url).hostname.replace(/^www\./, '')}</span>
+              </div>
+            `;
+          }
+        }
+      }
+
+      let content = `<div style="word-break:break-word; line-height:1.4;">${renderMessageContent(tx.message)}</div>`;
+      content += previewHtml;
+      content += `<div class="message-time">${extractTimeFromMessage(tx.message)}</div>`;
+
+      bubble.innerHTML = content;
+      enableDoubleTapRemove(bubble);
+      container.appendChild(bubble);
     });
 
     container.scrollTop = container.scrollHeight;
-  } catch {
-    container.innerHTML = "<div style='padding:50px;text-align:center;color:#888;'>Failed to load messages</div>";
+  } catch (err) {
+    container.innerHTML = `<div style="padding:50px; text-align:center; color:#888;">
+      Failed to load messages<br><small>${err.message}</small>
+    </div>`;
   }
 }
 
-/* DOUBLE TAP REMOVE */
 function enableDoubleTapRemove(el) {
   let lastTap = 0;
-  el.addEventListener("touchend", () => {
+  el.addEventListener("touchend", (e) => {
     const now = Date.now();
-    if (now - lastTap < 300) removeMessage(el);
+    if (now - lastTap < 300) {
+      e.preventDefault();
+      removeMessage(el);
+    }
     lastTap = now;
   });
   el.addEventListener("dblclick", () => removeMessage(el));
@@ -232,24 +291,23 @@ loadMessages();
 </script>
 
 <script>
-/* PWA INSTALL LOGIC */
+// PWA install prompt
 let deferredPrompt;
 const installBtn = document.getElementById("installBtn");
 
 window.addEventListener("beforeinstallprompt", (e) => {
   e.preventDefault();
   deferredPrompt = e;
-
   setTimeout(() => {
     installBtn.style.display = "block";
-  }, 5000);
+  }, 8000);
 });
 
 installBtn.addEventListener("click", async () => {
   if (!deferredPrompt) return;
   deferredPrompt.prompt();
-  const choice = await deferredPrompt.userChoice;
-  if (choice.outcome === "accepted") {
+  const { outcome } = await deferredPrompt.userChoice;
+  if (outcome === "accepted") {
     installBtn.style.display = "none";
   }
   deferredPrompt = null;
@@ -259,11 +317,11 @@ window.addEventListener("appinstalled", () => {
   installBtn.style.display = "none";
 });
 
-/* SERVICE WORKER */
+// Service Worker
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js');
+  navigator.serviceWorker.register('sw.js')
+    .catch(err => console.log("Service Worker failed:", err));
 }
 </script>
-
 </body>
 </html>
