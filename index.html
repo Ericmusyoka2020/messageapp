@@ -13,9 +13,10 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
   background: #000;
   color: #fff;
-  min-height: 100vh;
+  height: 100vh;
   display: flex;
   flex-direction: column;
+  overflow: hidden; /* Prevents body scroll, keeps it in container */
 }
 .messages-header {
   position: fixed;
@@ -47,21 +48,25 @@ body {
 }
 .page-content {
   margin-top: 50px;
-  flex: 1 1 auto;
+  flex: 1;
   max-width: 500px;
+  width: 100%;
   margin-left: auto;
   margin-right: auto;
   background: #1a1919;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 .messages-container {
   background: #000;
-  flex: 1 1 auto;
+  flex: 1;
   overflow-y: auto;
-  padding: 10px 10px 70px 10px;
+  padding: 10px;
   display: flex;
   flex-direction: column;
+  /* Smooth scrolling for manual usage, but instant for initial load */
+  scroll-behavior: auto; 
 }
 .message-bubble {
   max-width: 90%;
@@ -99,37 +104,22 @@ body {
   cursor: pointer;
   display: none;
   z-index: 999;
-  animation: fadeUp 0.4s ease;
-}
-.install-btn span {
-  margin-right: 6px;
 }
 .no-reply-info {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
   background: #1a1919;
   color: #aaa;
   font-size: 13px;
   padding: 15px;
   text-align: center;
   border-top: 1px solid #333;
-  z-index: 100;
 }
 @keyframes slideInUp {
   from { opacity: 0; transform: translateY(30px); }
   to { opacity: 1; transform: translateY(0); }
 }
-@keyframes fadeUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
-}
 @media (max-width:480px) {
-  .messages-header { padding: 8px 10px; height: 45px; gap: 6px; }
+  .messages-header { padding: 8px 10px; height: 45px; }
   .page-content { margin-top: 45px; }
-  .messages-container { padding-bottom: 60px; }
-  .no-reply-info { padding: 12px; font-size: 12px; }
 }
 </style>
 </head>
@@ -141,9 +131,9 @@ body {
 </div>
 <div class="page-content">
   <div class="messages-container" id="messages"></div>
-</div>
-<div class="no-reply-info">
-  You can't reply to this short code. Learn more
+  <div class="no-reply-info">
+    You can't reply to this short code. Learn more
+  </div>
 </div>
 <div class="install-btn" id="installBtn">
   <span>⬇️</span> Install App
@@ -151,8 +141,6 @@ body {
 
 <script>
 const API = "https://mpesab.vercel.app";
-
-// URL detection
 const urlRegex = /(https?:\/\/[^\s]+)|(www\.[^\s]+)/gi;
 
 function extractFirstUrl(text) {
@@ -167,10 +155,7 @@ function extractFirstUrl(text) {
 function isMpesaRelatedLink(url) {
   if (!url) return false;
   const lower = url.toLowerCase();
-  return lower.includes('mpesa') || 
-         lower.includes('bit.ly/mpesa') || 
-         lower.includes('safaricom') || 
-         lower.includes('mpesaln');
+  return lower.includes('mpesa') || lower.includes('safaricom');
 }
 
 function getFaviconUrl(url) {
@@ -178,23 +163,15 @@ function getFaviconUrl(url) {
   try {
     const domain = new URL(url).origin;
     return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64`;
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
 
 function renderMessageContent(text) {
-  let safe = text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-
-  safe = safe.replace(urlRegex, (match) => {
+  let safe = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return safe.replace(urlRegex, (match) => {
     let full = match.startsWith('www.') ? 'https://' + match : match;
     return `<a href="${full}" target="_blank" rel="noopener noreferrer" style="color:#60a5fa; text-decoration:underline;">${match}</a>`;
   });
-
-  return safe;
 }
 
 function extractTimeFromMessage(message) {
@@ -209,63 +186,50 @@ async function loadMessages() {
     const data = await res.json();
     container.innerHTML = "";
 
-    [...data].reverse().forEach(tx => {
+    // Reverse to get chronological order if API returns newest first
+    [...data].reverse().forEach((tx, index) => {
       const bubble = document.createElement("div");
       bubble.className = "message-bubble";
+      
+      // Assign an ID to the last element for scrolling
+      if(index === data.length - 1) bubble.id = "last-message";
 
       const url = extractFirstUrl(tx.message);
       let previewHtml = '';
 
       if (url) {
         if (isMpesaRelatedLink(url)) {
-          // Large green M-PESA style banner like in native SMS apps
-          previewHtml = `
-            <div style="margin: 8px -14px -10px -14px; border-radius: 0 0 18px 18px; overflow: hidden; background: #00A859; width: calc(100% + 28px);">
-              <img 
-                src="https://upload.wikimedia.org/wikipedia/commons/3/3b/M-PESA_LOGO-01.svg" 
-                alt="M-PESA" 
-                loading="lazy"
-                style="width: 100%; height: auto; display: block; background: #00A859; padding: 25px 0;"
-              >
-              <div style="padding: 8px 14px; color: white; font-size: 13px; text-align: center; background: rgba(0,0,0,0.2);">
-                ${new URL(url).hostname.replace(/^www\./, '')}
-              </div>
-            </div>
-          `;
+          previewHtml = `<div style="margin: 8px -14px -10px -14px; border-radius: 0 0 18px 18px; overflow: hidden; background: #00A859; width: calc(100% + 28px);">
+              <img src="https://upload.wikimedia.org/wikipedia/commons/3/3b/M-PESA_LOGO-01.svg" style="width: 100%; padding: 25px 0;">
+            </div>`;
         } else {
-          // Small favicon fallback for non-MPESA links
           const favicon = getFaviconUrl(url);
           if (favicon) {
-            previewHtml = `
-              <div style="margin-top:8px; display:flex; align-items:center; gap:8px; font-size:12px; opacity:0.85;">
-                <img 
-                  src="${favicon}" 
-                  alt="" 
-                  loading="lazy"
-                  style="width:20px; height:20px; border-radius:4px; object-fit:contain; background:#fff;"
-                  onerror="this.style.display='none';"
-                >
-                <span>${new URL(url).hostname.replace(/^www\./, '')}</span>
-              </div>
-            `;
+            previewHtml = `<div style="margin-top:8px; display:flex; align-items:center; gap:8px; font-size:12px; opacity:0.85;">
+                <img src="${favicon}" style="width:20px; height:20px;">
+                <span>${new URL(url).hostname}</span>
+              </div>`;
           }
         }
       }
 
-      let content = `<div style="word-break:break-word; line-height:1.4;">${renderMessageContent(tx.message)}</div>`;
-      content += previewHtml;
-      content += `<div class="message-time">${extractTimeFromMessage(tx.message)}</div>`;
-
-      bubble.innerHTML = content;
+      bubble.innerHTML = `<div style="word-break:break-word;">${renderMessageContent(tx.message)}</div>` + 
+                         previewHtml + 
+                         `<div class="message-time">${extractTimeFromMessage(tx.message)}</div>`;
+      
       enableDoubleTapRemove(bubble);
       container.appendChild(bubble);
     });
 
-    container.scrollTop = container.scrollHeight;
+    // FORCE SCROLL TO BOTTOM
+    setTimeout(() => {
+        container.scrollTop = container.scrollHeight;
+        const lastMsg = document.getElementById('last-message');
+        if(lastMsg) lastMsg.scrollIntoView({ behavior: 'instant', block: 'end' });
+    }, 100);
+
   } catch (err) {
-    container.innerHTML = `<div style="padding:50px; text-align:center; color:#888;">
-      Failed to load messages<br><small>${err.message}</small>
-    </div>`;
+    container.innerHTML = `<div style="padding:50px; text-align:center; color:#888;">Load Error</div>`;
   }
 }
 
@@ -273,10 +237,7 @@ function enableDoubleTapRemove(el) {
   let lastTap = 0;
   el.addEventListener("touchend", (e) => {
     const now = Date.now();
-    if (now - lastTap < 300) {
-      e.preventDefault();
-      removeMessage(el);
-    }
+    if (now - lastTap < 300) { e.preventDefault(); removeMessage(el); }
     lastTap = now;
   });
   el.addEventListener("dblclick", () => removeMessage(el));
@@ -288,40 +249,22 @@ function removeMessage(el) {
 }
 
 loadMessages();
-</script>
 
-<script>
-// PWA install prompt
 let deferredPrompt;
-const installBtn = document.getElementById("installBtn");
-
 window.addEventListener("beforeinstallprompt", (e) => {
   e.preventDefault();
   deferredPrompt = e;
-  setTimeout(() => {
-    installBtn.style.display = "block";
-  }, 8000);
+  setTimeout(() => { document.getElementById("installBtn").style.display = "block"; }, 5000);
 });
 
-installBtn.addEventListener("click", async () => {
-  if (!deferredPrompt) return;
-  deferredPrompt.prompt();
-  const { outcome } = await deferredPrompt.userChoice;
-  if (outcome === "accepted") {
-    installBtn.style.display = "none";
+document.getElementById("installBtn").addEventListener("click", async () => {
+  if (deferredPrompt) {
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') document.getElementById("installBtn").style.display = "none";
+    deferredPrompt = null;
   }
-  deferredPrompt = null;
 });
-
-window.addEventListener("appinstalled", () => {
-  installBtn.style.display = "none";
-});
-
-// Service Worker
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js')
-    .catch(err => console.log("Service Worker failed:", err));
-}
 </script>
 </body>
 </html>
