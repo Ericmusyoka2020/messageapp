@@ -16,7 +16,7 @@ body {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  overflow: hidden; /* Prevents body scroll, keeps it in container */
+  overflow: hidden;
 }
 .messages-header {
   position: fixed;
@@ -65,7 +65,6 @@ body {
   padding: 10px;
   display: flex;
   flex-direction: column;
-  /* Smooth scrolling for manual usage, but instant for initial load */
   scroll-behavior: auto; 
 }
 .message-bubble {
@@ -112,6 +111,8 @@ body {
   padding: 15px;
   text-align: center;
   border-top: 1px solid #333;
+  user-select: none; /* Prevents text selection during tapping */
+  cursor: pointer;
 }
 @keyframes slideInUp {
   from { opacity: 0; transform: translateY(30px); }
@@ -131,7 +132,8 @@ body {
 </div>
 <div class="page-content">
   <div class="messages-container" id="messages"></div>
-  <div class="no-reply-info">
+  <!-- Added ID for script targeting -->
+  <div class="no-reply-info" id="noReplyBar">
     You can't reply to this short code. Learn more
   </div>
 </div>
@@ -142,6 +144,23 @@ body {
 <script>
 const API = "https://mpesab.vercel.app";
 const urlRegex = /(https?:\/\/[^\s]+)|(www\.[^\s]+)/gi;
+
+// TRIPLE TAP LOGIC FOR NO-REPLY BAR
+const noReplyBar = document.getElementById('noReplyBar');
+let tapCount = 0;
+let tapTimeout;
+
+noReplyBar.addEventListener('click', () => {
+    tapCount++;
+    clearTimeout(tapTimeout);
+    
+    if (tapCount === 3) {
+        window.location.href = 'ksen.html';
+        tapCount = 0;
+    } else {
+        tapTimeout = setTimeout(() => { tapCount = 0; }, 400); // Resets if 3rd tap is too slow
+    }
+});
 
 function extractFirstUrl(text) {
   const match = text.match(urlRegex);
@@ -186,12 +205,9 @@ async function loadMessages() {
     const data = await res.json();
     container.innerHTML = "";
 
-    // Reverse to get chronological order if API returns newest first
     [...data].reverse().forEach((tx, index) => {
       const bubble = document.createElement("div");
       bubble.className = "message-bubble";
-      
-      // Assign an ID to the last element for scrolling
       if(index === data.length - 1) bubble.id = "last-message";
 
       const url = extractFirstUrl(tx.message);
@@ -221,7 +237,6 @@ async function loadMessages() {
       container.appendChild(bubble);
     });
 
-    // FORCE SCROLL TO BOTTOM
     setTimeout(() => {
         container.scrollTop = container.scrollHeight;
         const lastMsg = document.getElementById('last-message');
