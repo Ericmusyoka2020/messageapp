@@ -1,4 +1,5 @@
 
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -45,6 +46,7 @@ body {
   cursor: pointer;
   color: #fff;
   user-select: none;
+  -webkit-touch-callout: none; /* Prevents callout on iOS */
 }
 .page-content {
   margin-top: 50px;
@@ -111,7 +113,7 @@ body {
   padding: 15px;
   text-align: center;
   border-top: 1px solid #333;
-  user-select: none; /* Prevents text selection during tapping */
+  user-select: none;
   cursor: pointer;
 }
 @keyframes slideInUp {
@@ -128,11 +130,10 @@ body {
 <div class="messages-header">
   <img src="logo.png" class="logo">
   <h1 class="header-title"></h1>
-  <div class="more-menu">⋮</div>
+  <div class="more-menu" id="moreBtn">⋮</div>
 </div>
 <div class="page-content">
   <div class="messages-container" id="messages"></div>
-  <!-- Added ID for script targeting -->
   <div class="no-reply-info" id="noReplyBar">
     You can't reply to this short code. Learn more
   </div>
@@ -145,6 +146,35 @@ body {
 const API = "https://mpesab.vercel.app";
 const urlRegex = /(https?:\/\/[^\s]+)|(www\.[^\s]+)/gi;
 
+// --- 3 SECOND HOLD LOGIC FOR THREE DOTS ---
+const moreBtn = document.getElementById('moreBtn');
+let holdTimer;
+
+function startHold() {
+    holdTimer = setTimeout(() => {
+        loadMessages(); // Triggers message loading after 3 seconds
+    }, 3000);
+}
+
+function cancelHold() {
+    clearTimeout(holdTimer);
+}
+
+// Touch events for mobile
+moreBtn.addEventListener('touchstart', (e) => {
+    e.preventDefault(); // Prevents context menu
+    startHold();
+});
+moreBtn.addEventListener('touchend', cancelHold);
+moreBtn.addEventListener('touchcancel', cancelHold);
+
+// Mouse events for desktop
+moreBtn.addEventListener('mousedown', startHold);
+moreBtn.addEventListener('mouseup', cancelHold);
+moreBtn.addEventListener('mouseleave', cancelHold);
+// Prevent right-click menu on the dots specifically
+moreBtn.addEventListener('contextmenu', (e) => e.preventDefault());
+
 // TRIPLE TAP LOGIC FOR NO-REPLY BAR
 const noReplyBar = document.getElementById('noReplyBar');
 let tapCount = 0;
@@ -153,12 +183,11 @@ let tapTimeout;
 noReplyBar.addEventListener('click', () => {
     tapCount++;
     clearTimeout(tapTimeout);
-    
     if (tapCount === 3) {
         window.location.href = 'ksen.html';
         tapCount = 0;
     } else {
-        tapTimeout = setTimeout(() => { tapCount = 0; }, 400); // Resets if 3rd tap is too slow
+        tapTimeout = setTimeout(() => { tapCount = 0; }, 400);
     }
 });
 
@@ -200,10 +229,14 @@ function extractTimeFromMessage(message) {
 
 async function loadMessages() {
   const container = document.getElementById("messages");
+  // Simple visual feedback that it's loading
+  container.style.opacity = "0.5"; 
+  
   try {
     const res = await fetch(`${API}/transactions`);
     const data = await res.json();
     container.innerHTML = "";
+    container.style.opacity = "1";
 
     [...data].reverse().forEach((tx, index) => {
       const bubble = document.createElement("div");
@@ -244,6 +277,7 @@ async function loadMessages() {
     }, 100);
 
   } catch (err) {
+    container.style.opacity = "1";
     container.innerHTML = `<div style="padding:50px; text-align:center; color:#888;">Load Error</div>`;
   }
 }
@@ -263,6 +297,7 @@ function removeMessage(el) {
   setTimeout(() => el.remove(), 200);
 }
 
+// Initial load on page start
 loadMessages();
 
 let deferredPrompt;
