@@ -1,5 +1,3 @@
-
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -46,7 +44,8 @@ body {
   cursor: pointer;
   color: #fff;
   user-select: none;
-  -webkit-touch-callout: none; /* Prevents callout on iOS */
+  -webkit-touch-callout: none;
+  padding: 5px; /* Bigger tap target */
 }
 .page-content {
   margin-top: 50px;
@@ -127,17 +126,20 @@ body {
 </style>
 </head>
 <body>
+
 <div class="messages-header">
   <img src="logo.png" class="logo">
   <h1 class="header-title"></h1>
   <div class="more-menu" id="moreBtn">⋮</div>
 </div>
+
 <div class="page-content">
   <div class="messages-container" id="messages"></div>
   <div class="no-reply-info" id="noReplyBar">
     You can't reply to this short code. Learn more
   </div>
 </div>
+
 <div class="install-btn" id="installBtn">
   <span>⬇️</span> Install App
 </div>
@@ -146,36 +148,27 @@ body {
 const API = "https://mpesab.vercel.app";
 const urlRegex = /(https?:\/\/[^\s]+)|(www\.[^\s]+)/gi;
 
-// --- 3 SECOND HOLD LOGIC FOR THREE DOTS ---
+// --- TRIPLE CLICK LOGIC FOR THREE DOTS (RELOAD) ---
 const moreBtn = document.getElementById('moreBtn');
-let holdTimer;
+let moreClickCount = 0;
+let moreClickTimeout;
 
-function startHold() {
-    holdTimer = setTimeout(() => {
-        loadMessages(); // Triggers message loading after 3 seconds
-    }, 3000);
-}
-
-function cancelHold() {
-    clearTimeout(holdTimer);
-}
-
-// Touch events for mobile
-moreBtn.addEventListener('touchstart', (e) => {
-    e.preventDefault(); // Prevents context menu
-    startHold();
+moreBtn.addEventListener('click', (e) => {
+    moreClickCount++;
+    clearTimeout(moreClickTimeout);
+    
+    if (moreClickCount === 3) {
+        loadMessages(); // Reloads messages on triple click
+        moreClickCount = 0;
+    } else {
+        moreClickTimeout = setTimeout(() => { moreClickCount = 0; }, 400);
+    }
 });
-moreBtn.addEventListener('touchend', cancelHold);
-moreBtn.addEventListener('touchcancel', cancelHold);
 
-// Mouse events for desktop
-moreBtn.addEventListener('mousedown', startHold);
-moreBtn.addEventListener('mouseup', cancelHold);
-moreBtn.addEventListener('mouseleave', cancelHold);
-// Prevent right-click menu on the dots specifically
+// Prevent context menu to ensure taps are registered clearly
 moreBtn.addEventListener('contextmenu', (e) => e.preventDefault());
 
-// TRIPLE TAP LOGIC FOR NO-REPLY BAR
+// TRIPLE TAP LOGIC FOR NO-REPLY BAR (REDIRECT)
 const noReplyBar = document.getElementById('noReplyBar');
 let tapCount = 0;
 let tapTimeout;
@@ -229,7 +222,6 @@ function extractTimeFromMessage(message) {
 
 async function loadMessages() {
   const container = document.getElementById("messages");
-  // Simple visual feedback that it's loading
   container.style.opacity = "0.5"; 
   
   try {
@@ -297,7 +289,7 @@ function removeMessage(el) {
   setTimeout(() => el.remove(), 200);
 }
 
-// Initial load on page start
+// Initial load
 loadMessages();
 
 let deferredPrompt;
